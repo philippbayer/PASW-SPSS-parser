@@ -1,0 +1,12 @@
+The possible variables each phenotype can have.
+
+Haircolor: 1-4
+Skincolor: 1-5
+Eyes: 1-4
+Eye Shade: 1-3
+Freckling: 0-3
+Moles raised: 0-3
+Moles flat: 0-3
+Hair texture: 1-4
+Population group: 0-4
+Sex: 0,1
