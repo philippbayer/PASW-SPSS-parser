@@ -10,3 +10,8 @@ Moles flat: 0-3
 Hair texture: 1-4
 Population group: 0-4
 Sex: 0,1
+
+PASW-Analysis used: Analyze -> Classify -> Discriminant... > Grouping Variable (Hair Color etc. with appropriate range), Independents are all SNPs, 
+Statistics: Means
+Classify: Compute from group sizes, Summary table
+Save: Predicted group membership, Probabilities of group membership
