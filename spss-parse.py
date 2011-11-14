@@ -95,7 +95,7 @@ def tryToOpenFile(toparsename):
             print("Error: can't seem to open or find the file.")
             sys.exit()
     except:
-            print("Something went wrong, dunno lol")
+            print("Something weird went wrong")
             sys.exit()
             raise
 
@@ -123,8 +123,10 @@ def parse_file(fields, linelist, cutoff):
     while linecounter < len(linelist):
             currentLine = linelist[linecounter].replace("\n", "").split("\t")
             sample_id = currentLine[0]
-            if len(currentLine) != 1: # some lines only contain a \n
+            if len(currentLine) != 1: # some lines only contain a \n, we don't need these
                     m = Measurement(currentLine[fields["dis_1"]], currentLine[fields["dis1_1"]], currentLine[fields["dis2_1"]],currentLine[fields["dis3_1"]], currentLine[fields["dis4_1"]], sample_id, currentLine[1:fields["endOfSNPList"]], )
+                    # we also don't need measurements whose probability is lower than the user specified
+                    # as this might lead to overfitting
                     if m.getHighestProbability() < cutoff:
                         print >> sys.stderr, "Measurement %s is not going to be included" %m.getSampleID()
                     else:
@@ -155,17 +157,25 @@ def main():
     list_of_measurements = clean_list(list_of_measurements)
     trainlm = Trainer(TrainLM)
     # now go and create 1 ANN for each Measurement
+    # create ANN with 2 inputs, 4 outputs, 2 layers
+    net = nl.net.newff([[-1, 1],[1, 4]], [3,1])
+    # set to use Levenberg-Marquardt
+    net.trainf=trainlm
+    # inp is a numpy-array containing all SNPS (-1: 1) reshaped to 2D
+    inp = np.array()
+    # tar contains the actual group (somewhere between 1 and 4)
+    tar = np.array()
     for m in list_of_measurements:
-        net = nl.net.newff([[-7, 7]],[1, 1])
-        net.trainf=trainlm
-        #inp = np.array(m.getAllSNPs()).reshape(-1)
-        #tar = np.array(m.getProbabilityGroup()).reshape(-1)
-        input = np.random.uniform(-0.5, 0.5, (10, 2))
-        target = (input[:, 0] + input[:, 1]).reshape(10, 1)
+        # now go and append each m to the inp-ndarray
+        # current approach computationally expensive, makes more sense to initialize the
+        # arrays beforehand with the right size and then go and replace 
 
-        print(target)
-        print(input)
-        #err = net.train(inp, tar, epochs=150, show=10, goal=0.02)
+        # inp = np.array(m.getAllSNPs()).reshape(len(m.getAllSNPs())/2,2)
+        # tar = np.array([m.getProbabilityGroup(),m.getProbabilityGroup()]).reshape(1,2)
+
+
+    # got everything, time to train the ANN
+    err = net.train(inp, tar, epochs=150, show=10, goal=0.02)
 
 
 main()
