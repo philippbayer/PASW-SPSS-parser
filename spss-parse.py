@@ -57,11 +57,14 @@ class Measurement:
         else:
             return float(returnstuff)
 
-    def getAllMeasurements():
+    def getAllMeasurements(self):
         return Measurement.allMeasurements
 
     def getSampleID(self):
         return self.sample_id
+
+    def getAllSNPs(self):
+        return self.list_of_snps
 
     def inspect(self):
         return [self.predicted_group, self.list_of_probabilities, self.sample_id, self.list_of_snps]
@@ -150,9 +153,19 @@ def main():
     fields = getFormatOfOutput(linelist[0])
     list_of_measurements = parse_file(fields, linelist, args.p)
     list_of_measurements = clean_list(list_of_measurements)
-
+    trainlm = Trainer(TrainLM)
     # now go and create 1 ANN for each Measurement
     for m in list_of_measurements:
+        net = nl.net.newff([[-7, 7]],[1, 1])
+        net.trainf=trainlm
+        #inp = np.array(m.getAllSNPs()).reshape(-1)
+        #tar = np.array(m.getProbabilityGroup()).reshape(-1)
+        input = np.random.uniform(-0.5, 0.5, (10, 2))
+        target = (input[:, 0] + input[:, 1]).reshape(10, 1)
+
+        print(target)
+        print(input)
+        #err = net.train(inp, tar, epochs=150, show=10, goal=0.02)
 
 
 main()
