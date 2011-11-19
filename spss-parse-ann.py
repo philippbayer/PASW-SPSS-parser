@@ -163,18 +163,25 @@ def main():
     # set to use Levenberg-Marquardt
     net.trainf=trainlm
     # inp is a numpy-array containing all SNPS (-1: 1) reshaped to 2D
-    inp = np.array()
+    inp = []
     # tar contains the actual group (somewhere between 1 and 4)
-    tar = np.array()
-    #for m in list_of_measurements:
+    tar = []
+    for m in list_of_measurements:
         # now go and append each m to the inp-ndarray
         # current approach computationally expensive, makes more sense to initialize the
         # arrays beforehand with the right size and then go and replace 
+        #inp.append()
+        #tar.append()
+        inp.append(m.getAllSNPs())
+        tar.append([m.getProbabilityGroup()])
+        #inp = np.array(m.getAllSNPs()).reshape(len(m.getAllSNPs())/2,2)
+        #tar = np.array([m.getProbabilityGroup(),m.getProbabilityGroup()]).reshape(1,2)
 
-        # inp = np.array(m.getAllSNPs()).reshape(len(m.getAllSNPs())/2,2)
-        # tar = np.array([m.getProbabilityGroup(),m.getProbabilityGroup()]).reshape(1,2)
-
-
+    inp = np.array(inp)
+    tar = np.array(tar)
+    print(inp.shape)
+    print(net.ci)
+    #print(tar)
     # got everything, time to train the ANN
     #err = net.train(inp, tar, epochs=150, show=10, goal=0.02)
 
