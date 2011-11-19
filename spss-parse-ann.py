@@ -81,8 +81,9 @@ def transformStrToInt(string):
 def getArguments():
     ''' get the command-line options, return the filename'''
     parser = argparse.ArgumentParser(description ="Parse SPSS/PASW tab-delimited output")
-    parser.add_argument("filename", metavar="file", type=str, help="name of the SPSS/PASW output-file")
+    parser.add_argument("trainfile", metavar="trainfile", type=str, help="name of the SPSS/PASW output-file")
     parser.add_argument("-p",  type=float, default = 0, help="Cut-off probability - measurements with probability < prob will not be included")
+    parser.add_argument("testfile", metavar="testfile", type=str, help="name of the file with SNPs in unknown groups, same format as SPSS/PASW output-file")
 
     args = parser.parse_args()
     return args
@@ -148,7 +149,7 @@ def main():
     ''' The main-method - which calls all other methods'''
     # get the filename
     args = getArguments()
-    toparsename = args.filename
+    toparsename = args.trainfile
     # get all lines of the file in one big list
     # should be replaced by "for line in file", .readlines() is quite memory-hungry
     linelist = tryToOpenFile(toparsename).readlines()
@@ -165,7 +166,7 @@ def main():
     inp = np.array()
     # tar contains the actual group (somewhere between 1 and 4)
     tar = np.array()
-    for m in list_of_measurements:
+    #for m in list_of_measurements:
         # now go and append each m to the inp-ndarray
         # current approach computationally expensive, makes more sense to initialize the
         # arrays beforehand with the right size and then go and replace 
@@ -175,7 +176,11 @@ def main():
 
 
     # got everything, time to train the ANN
-    err = net.train(inp, tar, epochs=150, show=10, goal=0.02)
+    #err = net.train(inp, tar, epochs=150, show=10, goal=0.02)
+
+    # training done! time to have a look at the testing file
+    toparsename = args.testfile
+    #linelist = tryToOpenFile(toparsename).readlines()
 
 
 main()
