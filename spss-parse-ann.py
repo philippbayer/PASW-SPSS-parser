@@ -6,7 +6,34 @@ import argparse, sys
 # Numpy for nparrays
 import numpy as np
 # Custom Levenberg-Marquardt neurolab-class
-from trainln import * 
+from neurolab.core import Train, Trainer, TrainStop
+import neurolab as nl
+
+class TrainLM(Train):
+    
+    def __init__(self, net, input, target, **kwargs):
+        self.net = net
+        self.input = input
+        self.target = target
+        self.kwargs = kwargs
+        self.x = nl.tool.np_get_ref(net)
+        self.full_output = ()
+    
+    def fcn(self, x):
+        self.x[:] = x
+        output = net.sim(self.input)
+        err = self.error(self.net, self.input, self.target, output)
+        try:
+            self.epochf(err, self.net)
+        except TrainStop:
+            pass
+        return (self.target-output).flatten()
+        
+    def __call__(self, net, input, target):
+        from scipy.optimize import leastsq
+        
+        self.full_output = leastsq(func=self.fcn, x0=self.x.copy(), 
+                                    maxfev=self.epochs)
 
 class Measurement:
     ''' A measurement as predicted by PASW/SPSS
@@ -120,50 +147,49 @@ def clean_list(list_of_measurements):
         
     return list_of_measurements
 
-def main():
-    ''' The main-method - which calls all other methods'''
-    import neurolab as nl
-    # get the filename
-    args = getArguments()
-    toparsename = args.trainfile
-    # get all lines of the file in one big list
-    # should be replaced by "for line in file", .readlines() is quite memory-hungry
-    linelist = tryToOpenFile(toparsename).readlines()
-    fields = getFormatOfOutput(linelist[0])
-    list_of_measurements = parse_file(fields, linelist, args.p)
-    list_of_measurements = clean_list(list_of_measurements)
 
-    # how many SNPs do we have?
-    # all measurements should have the same amount
-    number_of_measurements = len(list_of_measurements[0].getAllSNPs())
-    
-    # inp is a list containing all SNPS 
-    inp = []
-    # tar contains the actual group for each measurement
-    tar = []
-    # now go and append each m to the inp-array
-    for m in list_of_measurements:
-        # current approach computationally expensive, makes more sense to initialize the
-        # arrays beforehand with the right size and then go and replace 
-        inp.append(m.getAllSNPs())
-        tar.append([m.getProbabilityGroup()])
+trainlm = Trainer(TrainLM)
+# get the filename
+args = getArguments()
+toparsename = args.trainfile
+# get all lines of the file in one big list
+# should be replaced by "for line in file", .readlines() is quite memory-hungry
+linelist = tryToOpenFile(toparsename).readlines()
+fields = getFormatOfOutput(linelist[0])
+list_of_measurements = parse_file(fields, linelist, args.p)
+list_of_measurements = clean_list(list_of_measurements)
 
-    # make numpy-arrays out of them (for 2D-shape)
-    inp = np.array(inp)
-    tar = np.array(tar)
-    # create ANN - possible inputs range from -1 to 1
-    net = nl.net.newff([[-1,1]]*number_of_measurements, [1,1])
-    # set to use Levenberg-Marquardt
-    net.trainf=Trainer(TrainLM)
-    # got everything, time to train the ANN
-    err = net.train(inp, tar, epochs=150, show=10)
+# how many SNPs do we have?
+# all measurements should have the same amount
+number_of_measurements = len(list_of_measurements[0].getAllSNPs())
 
-    # training done! time to have a look at the testing file
-    toparsename = args.testfile
-    # get all measurements
-    #linelist = tryToOpenFile(toparsename).readlines()
-    # now simulate!
-    #out = net.sim(inp)
+# inp is a list containing all SNPS 
+inp = []
+# tar contains the actual group for each measurement
+tar = []
+# now go and append each m to the inp-array
+for m in list_of_measurements:
+    # current approach computationally expensive, makes more sense to initialize the
+    # arrays beforehand with the right size and then go and replace 
+    inp.append(m.getAllSNPs())
+    tar.append([m.getProbabilityGroup()])
+
+# make numpy-arrays out of them (for 2D-shape)
+inp = np.array(inp)
+tar = np.array(tar)
+# create ANN - possible inputs range from -1 to 1
+net = nl.net.newff([[-1,1]]*number_of_measurements, [1,1])
+# set to use Levenberg-Marquardt
+net.trainf= Trainer(TrainLM)
+net.trainf=trainlm
+# got everything, time to train the ANN
+err = net.train(inp, tar, epochs=150, show=10)
+
+# training done! time to have a look at the testing file
+toparsename = args.testfile
+# get all measurements
+#linelist = tryToOpenFile(toparsename).readlines()
+# now simulate!
+#out = net.sim(inp)
 
 
-main()
