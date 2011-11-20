@@ -1,37 +1,12 @@
 #!/usr/bin/python
 
-# argparse for command-line options
+# Argparse for command-line options
+# Sys to access filesystem-functions
 import argparse, sys
+# Numpy for nparrays
 import numpy as np
-from neurolab.core import Train, Trainer, TrainStop
-import neurolab as nl
-
-class TrainLM(Train):
-    ''' The training class using Levenberg-Marquardt and the neurolab-package'''
-    def __init__(self, net, input, target, **kwargs):
-        self.net = net
-        self.input = input
-        self.target = target
-        self.kwargs = kwargs
-        self.x = tool.np_get_ref(net)
-        self.full_output = ()
-    
-    def fcn(self, x):
-        self.x[:] = x
-        output = net.sim(self.input)
-        err = self.error(self.net, self.input, self.target, output)
-        try:
-            self.epochf(err, self.net)
-        except TrainStop:
-            pass
-        return (self.target-output).flatten()
-        
-    def __call__(self, net, input, target):
-        from scipy.optimize import leastsq
-        #from scipy.optimize.minpack import error
-        
-        self.full_output = leastsq(func=self.fcn, x0=self.x.copy(), 
-                                    maxfev=self.epochs)
+# Custom Levenberg-Marquardt neurolab-class
+from trainln import * 
 
 class Measurement:
     ''' A measurement as predicted by PASW/SPSS
@@ -81,9 +56,9 @@ def transformStrToInt(string):
 def getArguments():
     ''' get the command-line options, return the filename'''
     parser = argparse.ArgumentParser(description ="Parse SPSS/PASW tab-delimited output")
-    parser.add_argument("trainfile", metavar="trainfile", type=str, help="name of the SPSS/PASW output-file")
+    parser.add_argument("trainfile", metavar="trainfile", type=str, help="Name of the SPSS/PASW output-file")
     parser.add_argument("-p",  type=float, default = 0, help="Cut-off probability - measurements with probability < prob will not be included")
-    parser.add_argument("testfile", metavar="testfile", type=str, help="name of the file with SNPs in unknown groups, same format as SPSS/PASW output-file")
+    parser.add_argument("testfile", metavar="testfile", type=str, help="Name of the file with SNPs in unknown groups, same format as SPSS/PASW output-file")
 
     args = parser.parse_args()
     return args
@@ -147,6 +122,7 @@ def clean_list(list_of_measurements):
 
 def main():
     ''' The main-method - which calls all other methods'''
+    import neurolab as nl
     # get the filename
     args = getArguments()
     toparsename = args.trainfile
@@ -156,38 +132,38 @@ def main():
     fields = getFormatOfOutput(linelist[0])
     list_of_measurements = parse_file(fields, linelist, args.p)
     list_of_measurements = clean_list(list_of_measurements)
-    trainlm = Trainer(TrainLM)
-    # now go and create 1 ANN for each Measurement
-    # create ANN with 2 inputs, 4 outputs, 2 layers
-    net = nl.net.newff([[-1, 1],[1, 4]], [3,1])
-    # set to use Levenberg-Marquardt
-    net.trainf=trainlm
-    # inp is a numpy-array containing all SNPS (-1: 1) reshaped to 2D
+
+    # how many SNPs do we have?
+    # all measurements should have the same amount
+    number_of_measurements = len(list_of_measurements[0].getAllSNPs())
+    
+    # inp is a list containing all SNPS 
     inp = []
-    # tar contains the actual group (somewhere between 1 and 4)
+    # tar contains the actual group for each measurement
     tar = []
+    # now go and append each m to the inp-array
     for m in list_of_measurements:
-        # now go and append each m to the inp-ndarray
         # current approach computationally expensive, makes more sense to initialize the
         # arrays beforehand with the right size and then go and replace 
-        #inp.append()
-        #tar.append()
         inp.append(m.getAllSNPs())
         tar.append([m.getProbabilityGroup()])
-        #inp = np.array(m.getAllSNPs()).reshape(len(m.getAllSNPs())/2,2)
-        #tar = np.array([m.getProbabilityGroup(),m.getProbabilityGroup()]).reshape(1,2)
 
+    # make numpy-arrays out of them (for 2D-shape)
     inp = np.array(inp)
     tar = np.array(tar)
-    print(inp.shape)
-    print(net.ci)
-    #print(tar)
+    # create ANN - possible inputs range from -1 to 1
+    net = nl.net.newff([[-1,1]]*number_of_measurements, [1,1])
+    # set to use Levenberg-Marquardt
+    net.trainf=Trainer(TrainLM)
     # got everything, time to train the ANN
-    #err = net.train(inp, tar, epochs=150, show=10, goal=0.02)
+    err = net.train(inp, tar, epochs=150, show=10)
 
     # training done! time to have a look at the testing file
     toparsename = args.testfile
+    # get all measurements
     #linelist = tryToOpenFile(toparsename).readlines()
+    # now simulate!
+    #out = net.sim(inp)
 
 
 main()
