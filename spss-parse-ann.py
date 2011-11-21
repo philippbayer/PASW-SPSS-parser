@@ -5,10 +5,9 @@
 import argparse, sys
 # Numpy for nparrays
 import numpy as np
-# Custom Levenberg-Marquardt neurolab-class
+# Neurolab for ANN
 from neurolab.core import Train, Trainer, TrainStop
 import neurolab as nl
-
 class TrainLM(Train):
     
     def __init__(self, net, input, target, **kwargs):
@@ -31,6 +30,7 @@ class TrainLM(Train):
         
     def __call__(self, net, input, target):
         from scipy.optimize import leastsq
+        #from scipy.optimize.minpack import error
         
         self.full_output = leastsq(func=self.fcn, x0=self.x.copy(), 
                                     maxfev=self.epochs)
@@ -73,7 +73,9 @@ class Measurement:
 
 def transformStrToInt(string):
     ''' Transforms the way small numbers are presented in SPSS/PASW to the way Python wants them'''
+    # when there's an E in the string, it's a tiny number
     if type(string) == str and "E" in string:
+        # example: 16E005 to 16*10^5
         number = float(string[0:string.index("E")])
         exponent = int(string[string.index("E")+1:len(string)])
         return number*(10**exponent)
@@ -81,10 +83,10 @@ def transformStrToInt(string):
         return string
 
 def getArguments():
-    ''' get the command-line options, return the filename'''
+    ''' get the command-line options, return the filenames and probability (optional)'''
     parser = argparse.ArgumentParser(description ="Parse SPSS/PASW tab-delimited output")
     parser.add_argument("trainfile", metavar="trainfile", type=str, help="Name of the SPSS/PASW output-file")
-    parser.add_argument("-p",  type=float, default = 0, help="Cut-off probability - measurements with probability < prob will not be included")
+    parser.add_argument("-p",  type=float, default = 0, help="Cut-off probability - measurements with probability < p won't be included")
     parser.add_argument("testfile", metavar="testfile", type=str, help="Name of the file with SNPs in unknown groups, same format as SPSS/PASW output-file")
 
     args = parser.parse_args()
@@ -100,7 +102,7 @@ def tryToOpenFile(toparsename):
     except:
             print("Something weird went wrong")
             sys.exit()
-            raise
+            raise # always fall back to this exception
 
 def getFormatOfOutput(line):
     ''' takes a list of all lines in the file to be parsed, looks at the first line
@@ -131,23 +133,17 @@ def parse_file(fields, linelist, cutoff):
                     # we also don't need measurements whose probability is lower than the user specified
                     # as this might lead to overfitting
                     if m.getHighestProbability() < cutoff:
-                        print >> sys.stderr, "Measurement %s is not going to be included" %m.getSampleID()
+                        print >> sys.stderr, "Measurement %s has too small probablity, not going to be included" %m.getSampleID()
+                    # we also don't need incomplete measurements
+                    elif m.getProbabilityGroup() == " ":
+                        print >> sys.stderr, "Measurement %s is incomplete, removing" %m.getSampleID()  
                     else:
+                        # everything fine, append to list
                         list_of_measurements.append(m)
             linecounter += 1
     return list_of_measurements
 
-def clean_list(list_of_measurements):
-    ''' go through the list of measurements, kick out elements with missing stuff '''
-    # going over a copy of the list because else counters get confused by removing elements
-    for m in list(list_of_measurements):
-        if m.getProbabilityGroup() == " ":
-            print >> sys.stderr, "Sample-ID %s is incomplete, removing" %m.getSampleID()
-            list_of_measurements.remove(m)
-        
-    return list_of_measurements
-
-
+print >>sys.stdout, "Starting..."
 trainlm = Trainer(TrainLM)
 # get the filename
 args = getArguments()
@@ -157,7 +153,6 @@ toparsename = args.trainfile
 linelist = tryToOpenFile(toparsename).readlines()
 fields = getFormatOfOutput(linelist[0])
 list_of_measurements = parse_file(fields, linelist, args.p)
-list_of_measurements = clean_list(list_of_measurements)
 
 # how many SNPs do we have?
 # all measurements should have the same amount
@@ -170,26 +165,36 @@ tar = []
 # now go and append each m to the inp-array
 for m in list_of_measurements:
     # current approach computationally expensive, makes more sense to initialize the
-    # arrays beforehand with the right size and then go and replace 
+    # arrays beforehand with the right size and then fill up
+    
     inp.append(m.getAllSNPs())
     tar.append([m.getProbabilityGroup()])
 
 # make numpy-arrays out of them (for 2D-shape)
 inp = np.array(inp)
 tar = np.array(tar)
+
+print >>sys.stdout, "Got all measurements, now creating ANN."
 # create ANN - possible inputs range from -1 to 1
-net = nl.net.newff([[-1,1]]*number_of_measurements, [1,1])
+print(inp)
+print(tar)
+
+print(inp.shape)
+print(tar.shape)
+net = nl.net.newff([[-1,1]]*number_of_measurements, [1])
+print("net.co %s" %net.co)
+print("net.ci %s" %net.ci)
 # set to use Levenberg-Marquardt
 net.trainf= Trainer(TrainLM)
-net.trainf=trainlm
 # got everything, time to train the ANN
-err = net.train(inp, tar, epochs=150, show=10)
+err = net.train(inp, tar, epochs=150, show=100)
 
 # training done! time to have a look at the testing file
+print >>sys.stdout, "Training is done, now testing."
 toparsename = args.testfile
 # get all measurements
 #linelist = tryToOpenFile(toparsename).readlines()
 # now simulate!
 #out = net.sim(inp)
 
-
+print >>sys.stdout, "Done! Have a nice day."
